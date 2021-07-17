@@ -37,11 +37,11 @@ func main() {
 	isRecursive := flag.Bool("recursive", false, "是否递归执行")
 	isGit := flag.Bool("git", false, "检测 Git 中的变更")
 	isSvn := flag.Bool("svn", false, "检测 SVN 中的变更")
-	inputPath := flag.String("path", wd, "检测地址(默认为当前目录)")
-	inputPhpExecFile := flag.String("php-executor", "php", "检测地址(默认为当前目录)")
+	inputPath := flag.String("path", wd, "检测地址")
+	inputPhpExecutor:= flag.String("php-executor", "php", "PHP 解释器可运行文件地址i")
 	flag.Parse()
 
-	phpExecutor = *inputPhpExecFile
+	phpExecutor = *inputPhpExecutor
 	printWelcome()
 
 	if *isGit {
