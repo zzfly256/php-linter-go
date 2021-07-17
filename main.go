@@ -17,17 +17,24 @@ import (
 // 用 Golang 给 PHP 做嫁衣的感觉真不错
 // by Rytia <admin@zzfly.net>, 2021-07-17 周六
 
-
-var wg sync.WaitGroup
-var result sync.Map
-var totalFile uint32
-var errFile uint32
+var (
+	wg        sync.WaitGroup
+	result    sync.Map
+	totalFile uint32
+	errFile   uint32
+)
 
 // PHP 可执行文件路径
 var phpExecutor string = "php"
 
 // 控制最大运行协程个数
 var ch = make(chan bool, 8)
+
+// 进程状态码
+var (
+	StatusCodeExceptionOccurred = 255
+	StatusCoedFilesError        = 254
+)
 
 func main() {
 
@@ -38,7 +45,7 @@ func main() {
 	isGit := flag.Bool("git", false, "检测 Git 中的变更")
 	isSvn := flag.Bool("svn", false, "检测 SVN 中的变更")
 	inputPath := flag.String("path", wd, "检测地址")
-	inputPhpExecutor:= flag.String("php-executor", "php", "PHP 解释器可运行文件地址i")
+	inputPhpExecutor := flag.String("php-executor", "php", "PHP 解释器可运行文件地址")
 	flag.Parse()
 
 	phpExecutor = *inputPhpExecutor
@@ -58,6 +65,10 @@ func main() {
 
 	wg.Wait()
 	printResult()
+
+	if errFile > 0 {
+		os.Exit(StatusCoedFilesError)
+	}
 	os.Exit(0)
 
 }
@@ -68,7 +79,7 @@ func printWelcome() {
 	stdout, err := execCommand(getPhpVersionCmd)
 	if err != nil {
 		color.HiRed("PHP execute error. Pleas ensure that php is installed and \"-php-executor\" parameter is correct")
-		os.Exit(255)
+		os.Exit(StatusCodeExceptionOccurred)
 	}
 
 	fmt.Printf("\nSimple PHP Linter (PHP %s) \n\n", stdout)
@@ -112,7 +123,7 @@ func lintGit() {
 	gitRootPath, err := execCommand(getGitRootPathCmd)
 	if err != nil {
 		color.HiRed("Git is not installed or work directory is not a git repository")
-		os.Exit(255)
+		os.Exit(StatusCodeExceptionOccurred)
 	}
 	gitRootPath = strings.Trim(gitRootPath, "\n")
 	fmt.Printf("Git Root:\t%s\n", gitRootPath)
@@ -128,7 +139,7 @@ func lintGit() {
 	gitDiffFileString, _ := execCommand(getGitDiffFilesCmd)
 	gitDiffFiles := strings.Split(gitDiffFileString, "\n")
 
-	for _, file :=range gitDiffFiles{
+	for _, file := range gitDiffFiles {
 		// 防止空串影响
 		if len(file) != 0 {
 			wg.Add(1)
@@ -143,7 +154,7 @@ func lintSvn() {
 	svnUrl, err := execCommand(getSvnUrlCmd)
 	if err != nil {
 		color.HiRed("SVN is not installed or work directory is not a svn repository")
-		os.Exit(255)
+		os.Exit(StatusCodeExceptionOccurred)
 	}
 	svnUrl = strings.Trim(svnUrl, "\n")
 	fmt.Printf("SVN Url:\t%s\n", svnUrl)
@@ -155,7 +166,7 @@ func lintSvn() {
 	svnDiffFileString, _ := execCommand(getSvnDiffFilesCmd)
 	svnDiffFiles := strings.Split(svnDiffFileString, "\n")
 
-	for _, file :=range svnDiffFiles{
+	for _, file := range svnDiffFiles {
 		// 防止空串影响
 		if len(file) != 0 {
 			wg.Add(1)
