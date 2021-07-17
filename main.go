@@ -18,14 +18,14 @@ import (
 // by Rytia <admin@zzfly.net>, 2021-07-17 周六
 
 var (
-	wg        sync.WaitGroup
-	result    sync.Map
-	totalFile uint32
-	errFile   uint32
+	processLintWg    sync.WaitGroup
+	lintErrResult    sync.Map
+	totalFileCounter uint32
+	errFileCounter   uint32
 )
 
 // PHP 可执行文件路径
-var phpExecutor string = "php"
+var phpExecutor = "php"
 
 // 控制最大运行协程个数
 var ch = make(chan bool, 8)
@@ -63,10 +63,10 @@ func main() {
 		}
 	}
 
-	wg.Wait()
+	processLintWg.Wait()
 	printResult()
 
-	if errFile > 0 {
+	if errFileCounter > 0 {
 		os.Exit(StatusCoedFilesError)
 	}
 	os.Exit(0)
@@ -88,13 +88,13 @@ func printWelcome() {
 func printResult() {
 	fmt.Println("\n---------------------------")
 	fmt.Println("Result:")
-	fmt.Printf("Check: %d / Errors: %d \n", totalFile, errFile)
+	fmt.Printf("Check: %d / Errors: %d \n", totalFileCounter, errFileCounter)
 
-	if errFile > 0 {
-		result.Range(processResultPrint)
+	if errFileCounter > 0 {
+		lintErrResult.Range(processResultPrint)
 	}
 
-	fmt.Println("\n")
+	fmt.Println()
 }
 
 // 获取执行目录下的文件，执行检测
@@ -111,7 +111,7 @@ func lintPath(path string, recursive bool) {
 		if recursive && file.IsDir() {
 			lintPath(path+"/"+file.Name(), recursive)
 		} else if strings.Contains(file.Name(), ".php") {
-			wg.Add(1)
+			processLintWg.Add(1)
 			go processPhpLint(path, file.Name())
 		}
 	}
@@ -142,7 +142,7 @@ func lintGit() {
 	for _, file := range gitDiffFiles {
 		// 防止空串影响
 		if len(file) != 0 {
-			wg.Add(1)
+			processLintWg.Add(1)
 			go processPhpLint(gitRootPath, file)
 		}
 	}
@@ -169,7 +169,7 @@ func lintSvn() {
 	for _, file := range svnDiffFiles {
 		// 防止空串影响
 		if len(file) != 0 {
-			wg.Add(1)
+			processLintWg.Add(1)
 			go processPhpLint(svnPath, file)
 		}
 	}
@@ -177,7 +177,7 @@ func lintSvn() {
 
 // 处理 PHP 语法检测
 func processPhpLint(path string, file string) {
-	defer wg.Done()
+	defer processLintWg.Done()
 
 	// 控制最大协程数
 	ch <- true
@@ -193,13 +193,13 @@ func processPhpLint(path string, file string) {
 
 	if err != nil {
 		fmt.Println(color.HiRedString("[ERR]"), file, err.Error())
-		result.Store(path+"/"+file, string(stdout))
-		atomic.AddUint32(&errFile, 1)
+		lintErrResult.Store(path+"/"+file, stdout)
+		atomic.AddUint32(&errFileCounter, 1)
 	} else {
 		fmt.Println(color.HiGreenString("[OK] "), file)
 	}
 
-	atomic.AddUint32(&totalFile, 1)
+	atomic.AddUint32(&totalFileCounter, 1)
 
 	<-ch
 }
